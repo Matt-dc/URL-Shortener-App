@@ -1,0 +1,3 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`<UrlInput /> Should check component mounts 1`] = `ShallowWrapper {}`;

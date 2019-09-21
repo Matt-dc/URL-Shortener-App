@@ -1,15 +1,14 @@
 import React, { Component } from "react";
 import axios from "axios";
-import { Col, Row, InputGroup, FormControl, Button } from "react-bootstrap";
+import { Col, Row } from "react-bootstrap";
 import ReactTimeout from "react-timeout";
 import PropTypes from "prop-types";
-import { CopyToClipboard } from "react-copy-to-clipboard";
 
+import getData from "../services/getData";
 import WarningMessage from "./WarningMessage";
 import UrlHistoryItem from "./UrlHistoryItem";
 import UrlInput from "./UrlInput";
 import DeleteModal from "./DeleteModal";
-import Spinner from "./Spinner";
 
 //favicon with https://gauger.io/fonticon/
 
@@ -28,16 +27,27 @@ class Shortener extends Component {
   };
 
   componentDidMount() {
-    this.setState({ loading: true });
-
-    axios.get("http://localhost:8888/").then(res => {
-      this.setState({
-        shorteningHistory: res.data.urls,
-        loading: false
-        // string: JSON.stringify(res.data),
-      });
-    });
+    this.fetchData();
   }
+
+  fetchData = async () => {
+    this.setState({
+      loading: true
+    });
+
+    try {
+      const response = await getData();
+      this.setState({
+        shorteningHistory: response,
+        loading: false
+      });
+    } catch (error) {
+      this.setState({
+        //SORT OUT
+        error: "Problem retrieving data..."
+      });
+    }
+  };
 
   handleChange = val => {
     this.setState({
@@ -69,7 +79,7 @@ class Shortener extends Component {
   handleShorten = e => {
     e.preventDefault();
 
-    if (this.state.URL == "") {
+    if (this.state.URL === "") {
       this.setState({
         error: "Enter a URL"
       });
@@ -96,7 +106,6 @@ class Shortener extends Component {
             this.setState({
               url: err.response.data.url,
               shorteningHistory: err.response.data.urls,
-              error: err.response.data.error,
               disabled: true,
               error: "That URL has already been shortened",
               loading: false
@@ -105,7 +114,6 @@ class Shortener extends Component {
             this.setState({
               url: err.response.data.url,
               shorteningHistory: err.response.data.urls,
-              error: err.response.data.error,
               disabled: true,
               error:
                 "That URL appears not to be valid :/ - it should begin with http or https",
@@ -125,11 +133,9 @@ class Shortener extends Component {
 
   saveUrl = url => {
     let obj = this.state.shorteningHistory
-      .find(item => item == url)
+      .find(item => item === url)
       .shortUrl.split("/")
       .pop();
-
-    // this.setState({ uniqueCode: JSON.stringify(uniqueCode), urlUpdater: JSON.stringify(urlObj) })
 
     axios
       .put(`http://localhost:8888/update/${obj}`, {
@@ -164,7 +170,7 @@ class Shortener extends Component {
 
   confirmDeleteUrl = longUrl => {
     const urlToDelete = this.state.shorteningHistory
-      .find(item => item.longUrl == longUrl)
+      .find(item => item.longUrl === longUrl)
       .shortUrl.split("/")
       .pop();
 
@@ -196,18 +202,11 @@ class Shortener extends Component {
   render() {
     if (this.state.copied) this.props.setTimeout(this.setCopiedFalse, 3000);
 
-    const spinner = (
-      <Spinner className="spinner" size="2x" spinning="spinning" />
-    );
-
-    // const timesRemaining = this.state.shorteningHistory.map(item => this.getTimeLeft(item.createdAt))
-
     return (
       <>
         <Row style={{ margin: "3em 0" }}>
           <Col>
             <h1 style={{ color: "#363636" }}>URL Shortener</h1>
-            <h1 style={{ color: "#363636" }}></h1>
           </Col>
         </Row>
         <Row style={{ margin: "0 0 4em 0" }}>
@@ -230,6 +229,7 @@ class Shortener extends Component {
               URL={this.state.URL}
               handleChange={this.handleChange}
               disabled={this.state.disabled}
+              handleShorten={this.handleShorten}
               loading={this.state.loading}
               shortened={this.state.shortened}
             />
@@ -277,11 +277,11 @@ class Shortener extends Component {
 Shortener.propTypes = {
   URL: PropTypes.string,
   shorteningHistory: PropTypes.array,
-  shortened: PropTypes.bool.isRequired,
+  shortened: PropTypes.bool,
   copied: PropTypes.string,
-  disabled: PropTypes.bool.isRequired,
+  disabled: PropTypes.bool,
   error: PropTypes.string,
-  loading: PropTypes.bool.isRequired,
+  loading: PropTypes.bool,
   urlUpdater: PropTypes.string,
   isBeingEdited: PropTypes.string,
   showDeleteModal: PropTypes.string

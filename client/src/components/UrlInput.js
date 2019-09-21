@@ -1,5 +1,5 @@
 import React from "react";
-import { InputGroup, FormControl, Button, Form } from "react-bootstrap";
+import { InputGroup, FormControl, Button } from "react-bootstrap";
 import { CopyToClipboard } from "react-copy-to-clipboard";
 
 import Spinner from "./Spinner";
