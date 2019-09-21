@@ -81,7 +81,7 @@ class Shortener extends Component {
 
     if (this.state.URL === "") {
       this.setState({
-        error: "Enter a URL"
+        error: "Enter a URL and click the button to shorten it"
       });
       return;
     } else {
@@ -94,31 +94,31 @@ class Shortener extends Component {
         .then(res => {
           if (res.status === 200) {
             this.setState({
-              URL: res.data.urls[0].shortUrl,
-              shorteningHistory: res.data.urls,
+              URL: res.data[0].shortUrl,
+              shorteningHistory: res.data,
               shortened: true,
               loading: false
             });
           }
         })
         .catch(err => {
-          if (err.response.status === 409) {
-            this.setState({
-              url: err.response.data.url,
-              shorteningHistory: err.response.data.urls,
-              disabled: true,
-              error: "That URL has already been shortened",
-              loading: false
-            });
-          } else if (err.response.status === 400) {
-            this.setState({
-              url: err.response.data.url,
-              shorteningHistory: err.response.data.urls,
-              disabled: true,
-              error:
-                "That URL appears not to be valid :/ - it should begin with http or https",
-              loading: false
-            });
+          if (err.response) {
+            if (err.response.status === 409) {
+              this.setState({
+                // response: JSON.stringify(err.response),
+                disabled: true,
+                error: "That URL has already been shortened",
+                loading: false
+              });
+            } else if (err.response.status === 400) {
+              this.setState({
+                // response: JSON.stringify(err.response)
+                disabled: true,
+                error:
+                  "That URL appears not to be valid :/ - it should begin with http or https",
+                loading: false
+              });
+            }
           }
         });
     }
@@ -143,14 +143,14 @@ class Shortener extends Component {
       })
       .then(res => {
         this.setState({
-          shorteningHistory: res.data.urls,
+          shorteningHistory: res.data,
           editingUrl: null,
           isBeingEdited: null
         });
       })
       .catch(err => {
         this.setState({
-          urlUpdater: "JSON.stringify(err.response)"
+          urlUpdater: "This URL already exists :/"
         });
       });
   };
@@ -176,7 +176,7 @@ class Shortener extends Component {
 
     axios.delete(`http://localhost:8888/delete/${urlToDelete}`).then(res => {
       this.setState({
-        shorteningHistory: res.data.urls,
+        shorteningHistory: res.data,
         showDeleteModal: null
       });
     });
@@ -206,7 +206,8 @@ class Shortener extends Component {
       <>
         <Row style={{ margin: "3em 0" }}>
           <Col>
-            <h1 style={{ color: "#363636" }}>URL Shortener</h1>
+            {/* <h1 style={{ color: "#363636" }}>URL Shortener</h1> */}
+            <h1 style={{ color: "#363636" }}>{this.state.response}</h1>
           </Col>
         </Row>
         <Row style={{ margin: "0 0 4em 0" }}>
@@ -237,7 +238,11 @@ class Shortener extends Component {
           <Col md={1}></Col>
         </Row>
 
-        <WarningMessage error={this.state.error} />
+        <Row style={{ textAlign: "center", margin: "0 0 4em 0" }}>
+          <Col>
+            <WarningMessage error={this.state.error} />
+          </Col>
+        </Row>
 
         <Row>
           <Col md={1}></Col>

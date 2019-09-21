@@ -14,6 +14,7 @@ export default function ShortenerInput(props) {
   return (
     <InputGroup size="lg" className="mb-3">
       <FormControl
+        style={{ color: props.shortened ? "#5f82d1" : "" }}
         onChange={changeHandler}
         value={props.URL}
         placeholder="Paste in your link"
