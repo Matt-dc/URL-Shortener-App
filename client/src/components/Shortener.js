@@ -15,7 +15,7 @@ import DeleteModal from "./DeleteModal";
 class Shortener extends Component {
   state = {
     URL: "",
-    shorteningHistory: [],
+    shortenHistory: [],
     shortened: false,
     copied: null,
     disabled: false,
@@ -38,12 +38,13 @@ class Shortener extends Component {
     try {
       const response = await getData();
       this.setState({
-        shorteningHistory: response,
+        shortenHistory: response,
         loading: false
       });
     } catch (error) {
       this.setState({
         //SORT OUT
+        loading: false,
         error: "Problem retrieving data..."
       });
     }
@@ -94,8 +95,8 @@ class Shortener extends Component {
         .then(res => {
           if (res.status === 200) {
             this.setState({
-              URL: res.data[0].shortUrl,
-              shorteningHistory: res.data,
+              URL: res.data.shortenedUrl.shortUrl,
+              shortenHistory: res.data.shortenHistory,
               shortened: true,
               loading: false
             });
@@ -132,7 +133,7 @@ class Shortener extends Component {
   };
 
   saveUrl = url => {
-    let obj = this.state.shorteningHistory
+    let obj = this.state.shortenHistory
       .find(item => item === url)
       .shortUrl.split("/")
       .pop();
@@ -143,15 +144,26 @@ class Shortener extends Component {
       })
       .then(res => {
         this.setState({
-          shorteningHistory: res.data,
+          shortenHistory: res.data.shortenHistory,
           editingUrl: null,
           isBeingEdited: null
         });
       })
-      .catch(err => {
-        this.setState({
-          urlUpdater: "This URL already exists :/"
-        });
+      .catch(error => {
+        if (error.response) {
+          if (error.response.status === 304) {
+            this.setState({
+              error: "You submitted the same URL",
+              shortenHistory: this.state.shortenHistory,
+              editingUrl: null,
+              isBeingEdited: null
+            });
+          } else if (error.response.status === 409) {
+            this.setState({
+              error: "This URL already exists :/"
+            });
+          }
+        }
       });
   };
 
@@ -169,17 +181,25 @@ class Shortener extends Component {
   };
 
   confirmDeleteUrl = longUrl => {
-    const urlToDelete = this.state.shorteningHistory
+    const urlToDelete = this.state.shortenHistory
       .find(item => item.longUrl === longUrl)
       .shortUrl.split("/")
       .pop();
 
-    axios.delete(`http://localhost:8888/delete/${urlToDelete}`).then(res => {
-      this.setState({
-        shorteningHistory: res.data,
-        showDeleteModal: null
+    axios
+      .delete(`http://localhost:8888/delete/${urlToDelete}`)
+      .then(res => {
+        this.setState({
+          shortenHistory: res.data.shortenHistory,
+          showDeleteModal: null,
+          URL: ""
+        });
+      })
+      .catch(error => {
+        this.setState({
+          error: "Couldn't delete"
+        });
       });
-    });
   };
 
   getTimeLeft = createdAt => {
@@ -204,10 +224,11 @@ class Shortener extends Component {
 
     return (
       <>
+        {this.state.urlUpdater}
         <Row style={{ margin: "3em 0" }}>
           <Col>
-            {/* <h1 style={{ color: "#363636" }}>URL Shortener</h1> */}
-            <h1 style={{ color: "#363636" }}>{this.state.response}</h1>
+            <h1 style={{ color: "#363636" }}>URL Shortener</h1>
+            {/* <h1 style={{ color: "#363636" }}>{this.state.response}</h1> */}
           </Col>
         </Row>
         <Row style={{ margin: "0 0 4em 0" }}>
@@ -247,8 +268,8 @@ class Shortener extends Component {
         <Row>
           <Col md={1}></Col>
           <Col md={10}>
-            {this.state.shorteningHistory.length > 0 &&
-              this.state.shorteningHistory.map(url => {
+            {this.state.shortenHistory.length > 0 &&
+              this.state.shortenHistory.map(url => {
                 return (
                   <UrlHistoryItem
                     copied={this.state.copied}
@@ -281,7 +302,7 @@ class Shortener extends Component {
 
 Shortener.propTypes = {
   URL: PropTypes.string,
-  shorteningHistory: PropTypes.array,
+  shortenHistory: PropTypes.array,
   shortened: PropTypes.bool,
   copied: PropTypes.string,
   disabled: PropTypes.bool,

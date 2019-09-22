@@ -13,21 +13,16 @@ export default function InputForm(props) {
         {props.isBeingEdited === props.url.longUrl ? (
           <Col md={5}>
             <InputGroup className="mb-3">
-              <FormControl
-                onChange={handleChange}
-                value={props.urlUpdater}
-                aria-label="Recipient's username"
-                aria-describedby="basic-addon2"
-              />
+              <FormControl onChange={handleChange} value={props.urlUpdater} />
             </InputGroup>
           </Col>
         ) : (
           <Col md={5}>
             <Row>
-              <Col>{props.url.longUrl}</Col>
+              <Col style={{ textAlign: "left" }}>{props.url.longUrl}</Col>
             </Row>
             <Row style={{ marginTop: "1em", fontSize: "0.8em" }}>
-              <Col>
+              <Col style={{ textAlign: "left" }}>
                 <p>Link deletes in : {props.timeRemaining} </p>
               </Col>
             </Row>

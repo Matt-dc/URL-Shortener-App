@@ -3,14 +3,28 @@ const express = require("express");
 const app = express();
 const bodyParser = require("body-parser");
 const cors = require("cors");
-const fs = require("fs");
 const validUrl = require("valid-url");
 var schedule = require("node-schedule");
+var generateUniqueString = require("./utils").generateUniqueString;
+var ShortenUrl = require("./utils").shortenUrl;
+var checkBody = require("./utils").checkBody;
+var getHistoryArray = require("./utils").getHistoryArray;
 
 const PORT = 8888;
+const BASE_URL = `http://localhost:${PORT}`;
 
-// global Urls array
-var URLS_ARRAY = [];
+// ####
+//
+// The main URLS object is used to store the URL objects created on each shortening operation, for faster look up.
+//
+// The shortenHistory array stores the last 10 shortening operations, with each consecutive operation
+// unshifted to the front of the array, and slicing out the first 10.
+//
+
+// ####
+
+var URLS = {};
+var shortenHistory = [];
 
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
@@ -33,100 +47,116 @@ app.use(cors());
 
 // schedule a filter every hour to destroy old shortened links - links last 1 day
 var deleteExpiredLinks = schedule.scheduleJob("00 * * * *", () => {
-  let filteredArr = URLS_ARRAY.filter(inDate => {
-    return Date.now() - inDate.createdAt < 86400000;
+  Object.keys(URLS).forEach(key => {
+    if (Date.now() - URLS[key][createdAt] > 86400000) {
+      delete URLS[key];
+    }
   });
-  URLS_ARRAY = filteredArr;
 });
 
 // Retrieves and returns the full URLS_ARRAY
 app.get("/", (req, res) => {
-  res.status(200).send(URLS_ARRAY);
+  res.status(200).json({ shortenHistory: shortenHistory });
+});
+
+// Shortens the submitted long url.
+//
+// upon shortening operations, the updated shortenHistory array and the new object are sent
+//
+app.post("/shorten", (req, res) => {
+  checkBody(req.body, "url");
+
+  const { url } = req.body;
+  const trimmedLongUrl = url.trim().replace(/\/$/, "");
+
+  if (
+    validUrl.is_http_uri(trimmedLongUrl) ||
+    validUrl.is_https_uri(trimmedLongUrl)
+  ) {
+    var rand = generateUniqueString(6);
+    if (URLS[rand] !== null) {
+      rand = generateUniqueString(6);
+    }
+
+    Object.keys(URLS).forEach(k => {
+      if (URLS[k]["longUrl"] == trimmedLongUrl) {
+        res.status(409).json({ shortenHistory: shortenHistory });
+        throw new Error("URL submitted already exists in URLs object");
+      }
+    });
+
+    let shortenedUrl = new ShortenUrl(rand, trimmedLongUrl);
+    URLS[rand] = shortenedUrl;
+    getHistoryArray(shortenedUrl, shortenHistory);
+
+    res.status(200).json({
+      shortenedUrl: shortenedUrl,
+      shortenHistory: shortenHistory
+    });
+  } else {
+    res.status(400).json({ shortenHistory: shortenHistory });
+    throw new Error("URL submitted is not valid");
+  }
 });
 
 // Takes the submitted short url and either redirects to an error page or the long url
 app.get("/:urlParam", (req, res) => {
   const { urlParam } = req.params;
 
-  const urlRedirect = URLS_ARRAY.find(
-    url => url["shortUrl"].split("/").pop() === urlParam
-  );
-
-  if (!urlRedirect) {
-    res.redirect(`http://localhost:3000/${urlParam}`);
-  } else {
-    res.redirect(urlRedirect);
+  if (!(urlParam in URLS)) {
+    res.status(404).redirect(`http://localhost:3000/${urlParam}`);
+    throw new Error("That unique code doesn't exist");
   }
-});
 
-// Shortens the submitted long url providing it doesn't already exist
-app.post("/shorten", (req, res) => {
-  const url = req.body.url;
-  const urlToShorten = url.trim().replace(/\/$/, "");
+  let urlRedirect = URLS[urlParam].longUrl;
 
-  if (
-    validUrl.is_http_uri(urlToShorten) ||
-    validUrl.is_https_uri(urlToShorten)
-  ) {
-    var rand = (Math.random() * Math.pow(36, 6)) | 0;
-    rand = rand.toString(36);
-
-    URLS_ARRAY.find(url => url["shortUrl"].split("/").pop() === rand);
-
-    rand = ((Math.random() * Math.pow(36, 6)) | 0).toString(36);
-
-    if (URLS_ARRAY.find(url => url["longUrl"] === urlToShorten)) {
-      res.status(409).send(URLS_ARRAY);
-      return;
-    }
-
-    const urlObject = {
-      longUrl: urlToShorten,
-      shortUrl: `${process.env.BASE_URL}/${rand}`,
-      createdAt: Date.now()
-    };
-
-    URLS_ARRAY.unshift(urlObject);
-    res.send(URLS_ARRAY);
-  } else {
-    res.status(400).send(URLS_ARRAY);
-  }
+  res.redirect(urlRedirect);
 });
 
 // Updates the long url and returns the full array to the front end
 app.put("/update/:shorturl", (req, res) => {
   const { shorturl } = req.params;
-  let { urlToUpdate } = req.body;
-  var checkArrayChanged;
 
-  if (!urlToUpdate) {
-    res.status(400).send("Invalid request parameters");
-  } else if (URLS_ARRAY.find(url => urlToUpdate === url["longUrl"])) {
-    res.status(409).send(URLS_ARRAY);
-    return;
-    // urlToUpdate = urlToUpdate.trim().replace(/\/$/, "");
+  checkBody(req.body, "urlToUpdate");
+  const { urlToUpdate } = req.body;
+
+  if (!(shorturl in URLS) || !("longUrl" in URLS[shorturl])) {
+    //if data doesn't exist
+    res.status(404).json({ shortenHistory: shortenHistory });
+
+    throw new Error("That url code doesn't correspond to a real URL");
+  } else if (URLS[shorturl].longUrl === urlToUpdate) {
+    // If nothing is changed
+    res.status(200).json({ shortenHistory: shortenHistory });
+    throw new Error("Duplicate URL was submitted. No changes were effected.");
+  } else if (
+    URLS[shorturl].shortUrl !== `${BASE_URL}/${shorturl}` &&
+    shorturl in URLS
+  ) {
+    res.status(409).json({
+      shortenedUrl: URLS[shorturl].shortUrl,
+      shortenHistory: shortenHistory,
+      URLS: URLS
+    });
+    throw new Error("That URL has already been assigned to another unique ID");
   } else if (
     !validUrl.is_http_uri(urlToUpdate) &&
     !validUrl.is_https_uri(urlToUpdate)
   ) {
     res.status(400).send("Invalid url format");
   } else {
-    let updatedArr = URLS_ARRAY.map(url => {
-      if (url.shortUrl.split("/").pop() == shorturl) {
-        checkArrayChanged = url;
+    URLS[shorturl].longUrl = urlToUpdate;
+
+    let updatedShortenHistory = shortenHistory.map(url => {
+      if (url.shortUrl === shorturl) {
         return { ...url, longUrl: urlToUpdate };
       } else {
         return url;
       }
     });
 
-    if (!checkArrayChanged) {
-      res.status(304).send(URLS_ARRAY);
-    } else {
-      URLS_ARRAY = updatedArr;
-      res.status(200).send(updatedArr);
-      checkArrayChanged = null;
-    }
+    shortenHistory = updatedShortenHistory;
+    res.status(200).json({ shortenHistory: shortenHistory });
   }
 });
 
@@ -134,11 +164,16 @@ app.put("/update/:shorturl", (req, res) => {
 app.delete("/delete/:urlToDelete", (req, res) => {
   const { urlToDelete } = req.params;
 
-  let updatedArr = URLS_ARRAY.filter(url => {
-    return url.shortUrl.split("/").pop() !== urlToDelete;
+  if (!(urlToDelete in URLS)) {
+    throw new Error("That unique doesn't exist");
+  }
+  delete URLS[urlToDelete];
+
+  let updatedShortenHistory = shortenHistory.filter(url => {
+    return url.shortUrl !== `${BASE_URL}/${urlToDelete}`;
   });
-  URLS_ARRAY = updatedArr;
-  res.send(URLS_ARRAY);
+  shortenHistory = updatedShortenHistory;
+  res.status(200).json({ shortenHistory: shortenHistory, URLS: URLS });
 });
 
 app.listen(PORT, () => {
@@ -151,4 +186,7 @@ app.all("*", (req, res) => {
     .send(
       "Invalid query. This is probably a problem with the body or url parameters"
     );
+  throw new Error(
+    "Invalid query. This is probably a problem with the body or url parameters"
+  );
 });
