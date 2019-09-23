@@ -1,4 +1,4 @@
-<img src="public/favicon.ico?raw=true" width="80px" />
+<img src="https://raw.githubusercontent.com/Matt-dc/URL-Shortener-App/master/client/public/favicon.ico?raw=true" width="80px" />
 
 # URL-Shortener-App
 
