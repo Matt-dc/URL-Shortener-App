@@ -8,11 +8,11 @@ URL shortener coding challenge.
 
 Open a terminal for Node and another for React, then:
 
-##### /URLShortenerApp npm start
+##### /URLShortenerApp --> npm install --> npm start
 
 and
 
-##### /URLShortenerApp/client npm start
+##### /URLShortenerApp/client --> npm install --> npm start
 
 The server runs on localhost port 8888, and React on localhost port 8889.
 
