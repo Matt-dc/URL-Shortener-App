@@ -91,7 +91,7 @@ class Shortener extends Component {
       const url = { url: this.state.URL };
 
       axios
-        .post("http://localhost:8888/shorten", url)
+        .post("/shorten", url)
         .then(res => {
           if (res.status === 200) {
             this.setState({
@@ -139,7 +139,7 @@ class Shortener extends Component {
       .pop();
 
     axios
-      .put(`http://localhost:8888/update/${obj}`, {
+      .put(`/update/${obj}`, {
         urlToUpdate: this.state.urlUpdater
       })
       .then(res => {
@@ -187,7 +187,7 @@ class Shortener extends Component {
       .pop();
 
     axios
-      .delete(`http://localhost:8888/delete/${urlToDelete}`)
+      .delete(`/delete/${urlToDelete}`)
       .then(res => {
         this.setState({
           shortenHistory: res.data.shortenHistory,

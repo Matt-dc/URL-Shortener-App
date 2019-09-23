@@ -3,6 +3,7 @@ const express = require("express");
 const app = express();
 const bodyParser = require("body-parser");
 const cors = require("cors");
+const path = require("path");
 const validUrl = require("valid-url");
 var schedule = require("node-schedule");
 var generateUniqueString = require("./utils").generateUniqueString;
@@ -26,9 +27,6 @@ const BASE_URL = `http://localhost:${PORT}`;
 var URLS = {};
 var shortenHistory = [];
 
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(bodyParser.json());
-
 app.use(function(req, res, next) {
   res.header("Access-Control-Allow-Credentials", true);
   res.header("Access-Control-Allow-Origin", req.headers.origin);
@@ -43,7 +41,17 @@ app.use(function(req, res, next) {
   next();
 });
 
-app.use(cors());
+app.use(
+  cors({
+    origin: "http://localhost:8889", //frontend server localhost:8080
+    methods: ["GET", "POST", "PUT", "DELETE"]
+  })
+);
+
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
+
+app.use(express.static(path.join(__dirname, "client", "build")));
 
 // schedule a filter every hour to destroy old shortened links - links last 1 day
 var deleteExpiredLinks = schedule.scheduleJob("00 * * * *", () => {
@@ -135,8 +143,7 @@ app.put("/update/:shorturl", (req, res) => {
   ) {
     res.status(409).json({
       shortenedUrl: URLS[shorturl].shortUrl,
-      shortenHistory: shortenHistory,
-      URLS: URLS
+      shortenHistory: shortenHistory
     });
     throw new Error("That URL has already been assigned to another unique ID");
   } else if (
@@ -173,11 +180,11 @@ app.delete("/delete/:urlToDelete", (req, res) => {
     return url.shortUrl !== `${BASE_URL}/${urlToDelete}`;
   });
   shortenHistory = updatedShortenHistory;
-  res.status(200).json({ shortenHistory: shortenHistory, URLS: URLS });
+  res.status(200).json({ shortenHistory: shortenHistory });
 });
 
-app.listen(PORT, () => {
-  console.log(`Running on port ${PORT}`);
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "client", "build", "index.html"));
 });
 
 app.all("*", (req, res) => {
@@ -190,3 +197,9 @@ app.all("*", (req, res) => {
     "Invalid query. This is probably a problem with the body or url parameters"
   );
 });
+
+app.listen(PORT, () => {
+  console.log(`Running on port ${PORT}`);
+});
+
+module.exports = app;
